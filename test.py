@@ -3,6 +3,22 @@ from PIL import Image
 import os
 import random
 
+# 무기 이미지 없으면 임시로 생성
+from PIL import ImageDraw
+
+def ensure_weapon_images():
+    os.makedirs("assets/weapons", exist_ok=True)
+    for name in weapon_list:
+        path = f"assets/weapons/{name.lower()}.png"
+        if not os.path.exists(path):
+            img = Image.new('RGB', (200, 200), color=(random.randint(50,200), random.randint(50,200), random.randint(50,200)))
+            draw = ImageDraw.Draw(img)
+            draw.text((10, 90), name, fill="white")
+            img.save(path)
+
+ensure_weapon_images()
+
+
 # 무기 설정
 weapon_list = ["Sword", "Gun", "Banana", "Hammer", "Grenade"]
 weapon_damage = {
