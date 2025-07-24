@@ -1,11 +1,19 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw
 import os
 import random
 
-# 무기 이미지 없으면 임시로 생성
-from PIL import ImageDraw
+# 무기 목록 및 데미지 정의 (⚠️ 먼저 정의해야 함)
+weapon_list = ["Sword", "Gun", "Banana", "Hammer", "Grenade"]
+weapon_damage = {
+    "Sword": (15, 30),
+    "Gun": (20, 35),
+    "Banana": (5, 15),
+    "Hammer": (10, 25),
+    "Grenade": (25, 40)
+}
 
+# 💡 무기 이미지가 없으면 자동 생성
 def ensure_weapon_images():
     os.makedirs("assets/weapons", exist_ok=True)
     for name in weapon_list:
@@ -18,17 +26,7 @@ def ensure_weapon_images():
 
 ensure_weapon_images()
 
-
-# 무기 설정
-weapon_list = ["Sword", "Gun", "Banana", "Hammer", "Grenade"]
-weapon_damage = {
-    "Sword": (15, 30),
-    "Gun": (20, 35),
-    "Banana": (5, 15),
-    "Hammer": (10, 25),
-    "Grenade": (25, 40)
-}
-
+# 전투 로직
 def assign_random_weapon():
     return random.choice(weapon_list)
 
@@ -48,11 +46,10 @@ def simulate_fight():
 
     return p1_weapon, p2_weapon, winner
 
-# Streamlit 화면 시작
+# 🖥️ Streamlit 앱 화면
 st.set_page_config(page_title="2인용 얼굴 격투 게임", layout="centered")
 st.title("🥊 내 얼굴로 하는 2인용 격투 게임")
 
-# 얼굴 업로드
 st.header("👤 플레이어 얼굴 업로드")
 col1, col2 = st.columns(2)
 
@@ -72,7 +69,6 @@ with col2:
         img2.save("players/player2.jpg")
         st.image(img2, caption="플레이어 2")
 
-# 전투 버튼
 if st.button("⚔️ 전투 시작!"):
     if not (player1_file and player2_file):
         st.warning("두 플레이어 모두 얼굴을 업로드해주세요.")
