@@ -1,71 +1,59 @@
 import streamlit as st
+import random
+import time
 
-# 경기장 크기 설정
-FIELD_WIDTH = 7
-FIELD_HEIGHT = 5
-GOAL_X = FIELD_WIDTH - 1
-GOAL_Y = FIELD_HEIGHT // 2
+# 설정
+GRID_SIZE = 3
+TIME_LIMIT = 10  # 게임 시간 (초)
 
 # 초기화
-if "ball_pos" not in st.session_state:
-    st.session_state.ball_pos = [0, FIELD_HEIGHT // 2]
-
 if "score" not in st.session_state:
     st.session_state.score = 0
 
-st.title("⚽ Streamlit 축구 조작 게임")
-st.caption("방향 버튼을 눌러 공을 이동시켜 골을 넣어보세요!")
+if "start_time" not in st.session_state:
+    st.session_state.start_time = None
 
-# 경기장 그리기 함수
-def draw_field():
-    field = ""
-    for y in range(FIELD_HEIGHT):
-        row = ""
-        for x in range(FIELD_WIDTH):
-            if [x, y] == st.session_state.ball_pos:
-                row += "🟡"  # 공
-            elif x == GOAL_X and y == GOAL_Y:
-                row += "🥅"  # 골대
-            else:
-                row += "🟩"
-        field += row + "\n"
-    return field
+if "target_index" not in st.session_state:
+    st.session_state.target_index = random.randint(0, GRID_SIZE**2 - 1)
 
-st.markdown("#### 경기장")
-st.text(draw_field())
-
-# 방향 버튼 UI
-col1, col2, col3 = st.columns(3)
-with col2:
-    if st.button("⬆️ 위"):
-        if st.session_state.ball_pos[1] > 0:
-            st.session_state.ball_pos[1] -= 1
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button("⬅️ 왼쪽"):
-        if st.session_state.ball_pos[0] > 0:
-            st.session_state.ball_pos[0] -= 1
-with col3:
-    if st.button("➡️ 오른쪽"):
-        if st.session_state.ball_pos[0] < FIELD_WIDTH - 1:
-            st.session_state.ball_pos[0] += 1
-
-col1, col2, col3 = st.columns(3)
-with col2:
-    if st.button("⬇️ 아래"):
-        if st.session_state.ball_pos[1] < FIELD_HEIGHT - 1:
-            st.session_state.ball_pos[1] += 1
-
-# 골 판정
-if st.session_state.ball_pos == [GOAL_X, GOAL_Y]:
-    st.success("🎉 골인! 점수 +1")
-    st.session_state.score += 1
-    st.session_state.ball_pos = [0, FIELD_HEIGHT // 2]
-
-st.markdown(f"**현재 점수: {st.session_state.score}골**")
-
-# 리셋 버튼
-if st.button("🔄 리셋"):
-    st.session_state.ball_pos = [0, FIELD_HEIGHT // 2]
+# 타이머 시작
+def start_game():
     st.session_state.score = 0
+    st.session_state.start_time = time.time()
+    st.session_state.target_index = random.randint(0, GRID_SIZE**2 - 1)
+
+# 게임 중인지 판별
+def is_playing():
+    return st.session_state.start_time is not None and (time.time() - st.session_state.start_time < TIME_LIMIT)
+
+# UI
+st.title("🐹 두더지 잡기 게임")
+st.caption("제한 시간 내에 최대한 많은 두더지를 잡아보세요!")
+
+if not is_playing():
+    if st.button("▶️ 게임 시작"):
+        start_game()
+
+# 게임 중이면 그리드 표시
+if is_playing():
+    remaining = TIME_LIMIT - int(time.time() - st.session_state.start_time)
+    st.markdown(f"⏱️ 남은 시간: **{remaining}초**")
+    st.markdown(f"📊 현재 점수: **{st.session_state.score}**")
+
+    # 버튼 그리드
+    cols = st.columns(GRID_SIZE)
+    for i in range(GRID_SIZE):
+        row = st.columns(GRID_SIZE)
+        for j in range(GRID_SIZE):
+            idx = i * GRID_SIZE + j
+            if idx == st.session_state.target_index:
+                if row[j].button("🐹", key=f"mole_{idx}_{random.random()}"):
+                    st.session_state.score += 1
+                    st.session_state.target_index = random.randint(0, GRID_SIZE**2 - 1)
+            else:
+                row[j].button("⬜", key=f"empty_{idx}_{random.random()}")
+
+else:
+    if st.session_state.start_time is not None:
+        st.success(f"⏰ 게임 종료! 최종 점수: **{st.session_state.score}점**")
+        st.session_state.start_time = None  # 재시작 가능하게 초기화
