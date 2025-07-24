@@ -2,77 +2,120 @@ import streamlit as st
 import random
 import time
 
-st.set_page_config(page_title="🏇 경마 베팅 게임", layout="centered")
+st.set_page_config(page_title="🏇 경마 베팅 전략 게임", layout="centered")
 
 # 초기 잔액 설정
 if "balance" not in st.session_state:
-    st.session_state.balance = 100000  # 10만원
+    st.session_state.balance = 200000
 
-# 경주마 목록
 horses = [f"말 {i+1}" for i in range(12)]
 
-st.title("🏇 실시간 경마 베팅 게임")
-st.caption("말을 선택하고 1등을 맞혀보세요!")
+# 말 컨디션 생성 함수
+def generate_conditions():
+    return {horse: random.choice(["매우 좋음", "좋음", "보통", "나쁨", "매우 나쁨"]) for horse in horses}
 
-# 잔액 및 베팅 UI
-st.markdown(f"**💰 현재 잔액:** {st.session_state.balance:,}원")
+condition_speed_modifier = {
+    "매우 좋음": (4, 7),
+    "좋음": (3, 6),
+    "보통": (2, 5),
+    "나쁨": (1, 4),
+    "매우 나쁨": (1, 3)
+}
 
-col1, col2 = st.columns(2)
-with col1:
-    selected_horse = st.selectbox("🐴 베팅할 말을 선택하세요:", horses)
-with col2:
-    bet_amount = st.number_input("💸 베팅 금액 (원)", min_value=10000, max_value=st.session_state.balance, step=10000)
+st.title("🏇 전략 경마 게임")
+st.markdown(f"**💰 잔액: {st.session_state.balance:,}원**")
 
-start_button = st.button("🚦 경주 시작!")
+# 말 상태
+if "conditions" not in st.session_state:
+    st.session_state.conditions = generate_conditions()
 
-# 경주 시작
-if start_button:
-    if bet_amount > st.session_state.balance:
-        st.error("베팅 금액이 잔액보다 많습니다.")
-    else:
-        st.success(f"{selected_horse}에 {bet_amount:,}원 베팅하셨습니다!")
-        st.write("🏁 경주 시작!")
-        
-        # 초기 위치
-        positions = {horse: 0 for horse in horses}
-        finish_line = 100
+with st.expander("🐴 이번 경기 말 컨디션 보기"):
+    for horse, cond in st.session_state.conditions.items():
+        st.write(f"{horse}: {cond}")
 
-        progress_placeholder = st.empty()
+# 게임 모드 선택
+mode = st.radio("🎮 게임 모드 선택", ["1등만 맞추기 (Easy)", "1~3등 순서 맞추기 (Hard)"])
 
-        winner = None
-        while True:
-            time.sleep(0.2)
-            # 각 말마다 랜덤한 속도 (약간의 확률 차이 부여)
-            for horse in horses:
-                positions[horse] += random.randint(1, 6 if horse != "말 1" else 7)  # 말 1이 약간 유리함
+# 유저 입력
+if mode == "1등만 맞추기 (Easy)":
+    pick = st.selectbox("🥇 1등 예상", horses)
+else:
+    st.subheader("🎯 베팅할 말 선택 (1, 2, 3등 순서대로)")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        pick1 = st.selectbox("🥇 1등 예상", horses, key="pick1")
+    with col2:
+        pick2 = st.selectbox("🥈 2등 예상", [h for h in horses if h != pick1], key="pick2")
+    with col3:
+        pick3 = st.selectbox("🥉 3등 예상", [h for h in horses if h not in [pick1, pick2]], key="pick3")
 
-            # 말 위치 시각화 (텍스트 기반)
-            lines = []
-            for horse in horses:
-                bar = "▰" * (positions[horse] // 3)
-                lines.append(f"{horse}: {bar}")
+bet_amount = st.number_input("💸 베팅 금액 (만원 단위)", min_value=10000, max_value=st.session_state.balance, step=10000)
 
-            progress_placeholder.markdown("```\n" + "\n".join(lines) + "\n```")
+start_race = st.button("🚦 경주 시작!")
 
-            # 결승선 도달 확인
-            for horse, pos in positions.items():
-                if pos >= finish_line:
-                    winner = horse
-                    break
-            if winner:
-                break
+# 경주 실행
+if start_race:
+    positions = {horse: 0 for horse in horses}
+    finish_line = 100
+    rankings = []
+    race_box = st.empty()
 
-        st.subheader(f"🏆 우승마: {winner}!")
+    st.session_state.conditions = generate_conditions()
+    st.success(f"{' / '.join([pick1, pick2, pick3]) if mode != '1등만 맞추기 (Easy)' else pick} 에 {bet_amount:,}원 베팅 완료!")
 
-        # 결과 처리
-        if selected_horse == winner:
-            reward = bet_amount * 10
-            st.session_state.balance += reward
-            st.success(f"🎉 정답! {reward:,}원 적중! 잔액: {st.session_state.balance:,}원")
+    while True:
+        time.sleep(0.15)
+        for horse in horses:
+            if horse not in rankings:
+                cond = st.session_state.conditions[horse]
+                spd_range = condition_speed_modifier[cond]
+                positions[horse] += random.randint(*spd_range)
+
+                if positions[horse] >= finish_line and horse not in rankings:
+                    rankings.append(horse)
+
+        # 화면 표시
+        display = ""
+        for horse in horses:
+            bar = "▰" * (positions[horse] // 3)
+            display += f"{horse}: {bar}\n"
+        race_box.markdown(f"```\n{display}\n```")
+
+        # 경기 종료 조건
+        if (mode == "1등만 맞추기 (Easy)" and len(rankings) >= 1) or \
+           (mode == "1~3등 순서 맞추기 (Hard)" and len(rankings) >= 3):
+            break
+
+    st.subheader("🏁 경기 결과")
+    for i, horse in enumerate(rankings[:3]):
+        medal = ["🥇", "🥈", "🥉"][i]
+        st.markdown(f"{medal} {horse}")
+
+    # 결과 판단 및 보상
+    if mode == "1등만 맞추기 (Easy)":
+        if rankings[0] == pick:
+            payout = bet_amount * 5
+            st.success(f"🎉 1등 적중! {payout:,}원 획득!")
+            st.session_state.balance += payout
         else:
+            st.warning(f"❌ 아쉽게도 틀렸습니다. {bet_amount:,}원 손실")
             st.session_state.balance -= bet_amount
-            st.error(f"❌ 아쉽습니다. {bet_amount:,}원 잃었습니다. 잔액: {st.session_state.balance:,}원")
+    else:
+        guess = [pick1, pick2, pick3]
+        correct = rankings[:3]
+        if guess == correct:
+            payout = bet_amount * 50
+            st.balloons()
+            st.success(f"🎯 완벽 적중! {payout:,}원 획득!")
+            st.session_state.balance += payout
+        elif all(p in correct for p in guess):
+            payout = bet_amount * 3
+            st.success(f"✨ 순서는 다르지만 1~3등 안에 모두 포함! {payout:,}원 획득!")
+            st.session_state.balance += payout
+        else:
+            st.warning(f"😢 틀렸습니다. {bet_amount:,}원 손실")
+            st.session_state.balance -= bet_amount
 
-        # 다시하기
-        if st.session_state.balance <= 0:
-            st.warning("💀 잔액이 0원이 되어 게임이 종료됩니다. 다시 시작하려면 앱을 새로고침하세요.")
+    # 게임 종료 처리
+    if st.session_state.balance <= 0:
+        st.error("💀 자본이 모두 사라졌습니다. 새로고침하여 재시작하세요.")
